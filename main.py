@@ -5,16 +5,8 @@ from sklearn.preprocessing import MinMaxScaler  # type: ignore
 from tensorflow.keras.models import Sequential  # type: ignore
 from tensorflow.keras.layers import LSTM, Dense  # type: ignore
 
-# 1. Membuat data contoh sederhana (ganti dengan data Anda sendiri)
-# Misalnya data harian selama 2 tahun
-dates = pd.date_range(start="2022-01-01", end="2023-12-31", freq="D")
-data = np.sin(np.arange(len(dates)) * 0.1) + np.random.normal(0, 0.1, len(dates))
-df = pd.DataFrame(data, index=dates, columns=["value"])
 
-
-# 2. Persiapkan data
 def prepare_data(data, look_back=7):
-    # Normalisasi data
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform(data.values.reshape(-1, 1))
 
@@ -26,7 +18,6 @@ def prepare_data(data, look_back=7):
     return np.array(X), np.array(y), scaler
 
 
-# 3. Buat dan latih model
 def create_model(look_back):
     model = Sequential(
         [LSTM(50, activation="relu", input_shape=(look_back, 1)), Dense(1)]
@@ -35,10 +26,37 @@ def create_model(look_back):
     return model
 
 
-# 4. Jalankan proses training dan prediksi
+def predict_future(model, last_sequence, scaler, n_future=30):
+    """
+    Memprediksi n_future hari ke depan
+    """
+    future_predictions = []
+    current_sequence = last_sequence.copy()
+
+    for _ in range(n_future):
+        # Prediksi nilai berikutnya
+        current_prediction = model.predict(current_sequence.reshape(1, -1, 1))
+        future_predictions.append(current_prediction[0, 0])
+
+        # Update sequence untuk prediksi berikutnya
+        current_sequence = np.roll(current_sequence, -1)
+        current_sequence[-1] = current_prediction
+
+    # Transform kembali ke skala asli
+    future_predictions = np.array(future_predictions).reshape(-1, 1)
+    future_predictions = scaler.inverse_transform(future_predictions)
+
+    return future_predictions
+
+
 def main():
+    # 1. Membuat data contoh sederhana
+    dates = pd.date_range(start="2022-01-01", end="2023-12-31", freq="D")
+    data = np.sin(np.arange(len(dates)) * 0.1) + np.random.normal(0, 0.1, len(dates))
+    df = pd.DataFrame(data, index=dates, columns=["value"])
+
     # Siapkan data
-    look_back = 7  # menggunakan 7 hari sebelumnya untuk prediksi
+    look_back = 7
     X, y, scaler = prepare_data(df, look_back)
 
     # Bagi data menjadi train dan test
@@ -53,47 +71,55 @@ def main():
         X_train, y_train, epochs=50, batch_size=32, validation_split=0.1, verbose=1
     )
 
-    # Lakukan prediksi
+    # Prediksi pada data test
     print("\nMembuat prediksi...")
     predictions = model.predict(X_test)
-
-    # Transform kembali ke skala asli
     predictions = scaler.inverse_transform(predictions)
     actual = scaler.inverse_transform(y_test)
 
-    # Tampilkan beberapa hasil prediksi
-    print("\nPerbandingan hasil prediksi dengan nilai sebenarnya:")
-    print("Prediksi\t\tAktual")
-    for pred, act in zip(predictions[:5], actual[:5]):
-        print(f"{pred[0]:.2f}\t\t{act[0]:.2f}")
+    # Prediksi 30 hari ke depan
+    print("\nMemprediksi 30 hari ke depan...")
+    last_sequence = X[-1]  # Mengambil sequence terakhir
+    future_pred = predict_future(model, last_sequence, scaler, n_future=30)
 
-    # Plot hasil prediksi vs aktual
-    plt.figure(figsize=(12, 6))
-    plt.plot(actual, label="Aktual", color="blue")
-    plt.plot(predictions, label="Prediksi", color="red")
-    plt.title("Perbandingan Nilai Aktual vs Prediksi")
-    plt.xlabel("Timestep")
+    # Buat tanggal untuk prediksi masa depan
+    last_date = df.index[-1]
+    future_dates = pd.date_range(
+        start=last_date + pd.Timedelta(days=1), periods=30, freq="D"
+    )
+
+    # Plot hasil
+    plt.figure(figsize=(15, 7))
+
+    # Plot data historis
+    plt.plot(df.index[-100:], df["value"][-100:], label="Data Historis", color="blue")
+
+    # Plot prediksi masa depan
+    plt.plot(
+        future_dates,
+        future_pred,
+        label="Prediksi 30 Hari Kedepan",
+        color="red",
+        linestyle="--",
+    )
+
+    plt.title("Prediksi 30 Hari Kedepan")
+    plt.xlabel("Tanggal")
     plt.ylabel("Nilai")
     plt.legend()
     plt.grid(True)
+    plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig("prediction_plot.png")
+    plt.savefig("future_prediction_plot.png")
     plt.close()
 
-    # Plot scatter
-    plt.figure(figsize=(8, 8))
-    plt.scatter(actual, predictions)
-    plt.plot([actual.min(), actual.max()], [actual.min(), actual.max()], "r--", lw=2)
-    plt.title("Scatter Plot Aktual vs Prediksi")
-    plt.xlabel("Aktual")
-    plt.ylabel("Prediksi")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("scatter_plot.png")
-    plt.close()
-
-    print("\nPlot telah disimpan sebagai 'prediction_plot.png' dan 'scatter_plot.png'")
+    # Tampilkan prediksi dalam format tabel
+    future_df = pd.DataFrame(future_pred, index=future_dates, columns=["Prediksi"])
+    print("\nPrediksi 30 hari ke depan:")
+    print(future_df)
+    print("\nPlot telah disimpan sebagai 'future_prediction_plot.png'")
 
 
 if __name__ == "__main__":
+
     main()
