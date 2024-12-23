@@ -3,8 +3,8 @@ import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.models import Sequential  # type: ignore
+from tensorflow.keras.layers import LSTM, Dense  # type: ignore
 from model import get_values  # Import fungsi get_values dari model.py
 
 
@@ -67,7 +67,7 @@ def predict_future(model, last_sequence, scaler, n_future=30):
 def main():
     # Ambil data dari database menggunakan get_values
     data_pairs = get_values(
-        "a586c9e4-dfa6-44fa-bc05-cba092eef33d", "88a07a75-1f84-4436-bcf0-12739900bf4a"
+        "414520b7-e7b0-4fea-aa7a-d7b40f444963", "9dcb7e40-ada7-43eb-baf4-2ed584233de7"
     )
 
     # Konversi data ke format yang sesuai
